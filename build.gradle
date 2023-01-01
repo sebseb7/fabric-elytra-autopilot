@@ -39,10 +39,10 @@ dependencies {
 	modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
 
 	modImplementation "com.github.Lortseam.completeconfig:base:${project.completeconfig_version}"
-	include "com.gitlab.Lortseam.completeconfig:base:${project.completeconfig_version}"
+	include "com.github.Lortseam.completeconfig:base:${project.completeconfig_version}"
 
 	modImplementation("com.github.Lortseam.completeconfig:gui-cloth:${project.completeconfig_version}")
-	include "com.gitlab.Lortseam.completeconfig:gui-cloth:${project.completeconfig_version}"
+	include "com.github.Lortseam.completeconfig:gui-cloth:${project.completeconfig_version}"
 }
 
 processResources {
