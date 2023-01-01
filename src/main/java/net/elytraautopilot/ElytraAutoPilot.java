@@ -31,7 +31,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class ElytraAutoPilot implements ClientModInitializer {
-    private static final String modid = "elytraautopilot";
+    private static final String MODID = "elytraautopilot";
     public static final Logger LOGGER = LoggerFactory.getLogger("ElytraAutoPilot");
     private static boolean configPressed = false;
     private static boolean landPressed = false;
@@ -39,8 +39,8 @@ public class ElytraAutoPilot implements ClientModInitializer {
     public static MinecraftClient minecraftClient;
     public static boolean calculateHud;
     public static boolean autoFlight;
-    private static boolean startCooldown;
-    private static int cooldown = 0;
+    private static final int TAKEOFF_COOLDOWN_TICKS = 5;
+    private static int takeoffCooldown = 0;
     private static boolean onTakeoff;
     public static double pitchMod = 1f;
 
@@ -61,6 +61,7 @@ public class ElytraAutoPilot implements ClientModInitializer {
     public static boolean isflytoActive = false;
     public static boolean forceLand = false;
     public static boolean isLanding = false;
+    public static float GLIDE_ANGLE = 0.0f;
     public static boolean doGlide = false;
     public static double distance = 0f;
     public static double groundheight;
@@ -74,17 +75,17 @@ public class ElytraAutoPilot implements ClientModInitializer {
         HudRenderCallback.EVENT.register((matrixStack, tickDelta) -> ElytraAutoPilot.this.onScreenTick());
         ClientTickEvents.END_CLIENT_TICK.register(e -> this.onClientTick());
 
-        config = new ModConfig(modid);
+        config = new ModConfig(MODID);
         config.load();
 
         if (FabricLoader.getInstance().isModLoaded("cloth-config")) {
-            ConfigScreenBuilder.setMain(modid, new ClothConfigScreenBuilder());
+            ConfigScreenBuilder.setMain(MODID, new ClothConfigScreenBuilder());
         }
         ClientCommands.register(minecraftClient);
     }
 
     public static String getModId() {
-        return modid;
+        return MODID;
     }
 	public static void takeoff()
     {
@@ -96,15 +97,15 @@ public class ElytraAutoPilot implements ClientModInitializer {
                 Item itemChest = player.getInventory().armor.get(2).getItem();
                 int elytraDamage = player.getInventory().armor.get(2).getMaxDamage() - player.getInventory().armor.get(2).getDamage();
                 if (itemChest != Items.ELYTRA) {
-                    player.sendMessage(Text.translatable("text." + modid + ".takeoffFail.noElytraEquipped").formatted(Formatting.RED), true);
+                    player.sendMessage(Text.translatable("text." + MODID + ".takeoffFail.noElytraEquipped").formatted(Formatting.RED), true);
                     return;
                 }
                 if (elytraDamage == 1) {
-                    player.sendMessage(Text.translatable("text." + modid + ".takeoffFail.elytraBroken").formatted(Formatting.RED), true);
+                    player.sendMessage(Text.translatable("text." + MODID + ".takeoffFail.elytraBroken").formatted(Formatting.RED), true);
                     return;
                 }
                 if (itemMain != Items.FIREWORK_ROCKET && itemOff != Items.FIREWORK_ROCKET ) {
-                    player.sendMessage(Text.translatable("text." + modid + ".takeoffFail.fireworkRequired").formatted(Formatting.RED), true);
+                    player.sendMessage(Text.translatable("text." + MODID + ".takeoffFail.fireworkRequired").formatted(Formatting.RED), true);
                     return;
                 }
 
@@ -116,12 +117,12 @@ public class ElytraAutoPilot implements ClientModInitializer {
                 for (double i = c; i < l; i++) {
                     BlockPos blockPos = new BlockPos(clientPos.getX(), clientPos.getY() + n, clientPos.getZ());
                     if (!world.getBlockState(blockPos).isAir()) {
-                        player.sendMessage(Text.translatable("text." + modid + ".takeoffFail.clearSkyNeeded").formatted(Formatting.RED), true);
+                        player.sendMessage(Text.translatable("text." + MODID + ".takeoffFail.clearSkyNeeded").formatted(Formatting.RED), true);
                         return;
                     }
                     n++;
                 }
-                startCooldown = true;
+                takeoffCooldown = TAKEOFF_COOLDOWN_TICKS;
                 minecraftClient.options.jumpKey.setPressed(true);
             }
             return;
@@ -136,7 +137,7 @@ public class ElytraAutoPilot implements ClientModInitializer {
                 if (isChained) {
                     isflytoActive = true;
                     isChained = false;
-                    minecraftClient.inGameHud.getChatHud().addMessage(Text.translatable("text." + modid + ".flyto", argXpos, argZpos).formatted(Formatting.GREEN));
+                    minecraftClient.inGameHud.getChatHud().addMessage(Text.translatable("text." + MODID + ".flyto", argXpos, argZpos).formatted(Formatting.GREEN));
                 }
                 return;
             }
@@ -149,7 +150,7 @@ public class ElytraAutoPilot implements ClientModInitializer {
                     minecraftClient.options.useKey.setPressed(false);
                     minecraftClient.options.jumpKey.setPressed(false);
                     onTakeoff = false;
-                    player.sendMessage(Text.translatable("text." + modid + ".takeoffAbort.noFirework").formatted(Formatting.RED), true);
+                    player.sendMessage(Text.translatable("text." + MODID + ".takeoffAbort.noFirework").formatted(Formatting.RED), true);
                     doGlide = true;
                 }
             }
@@ -158,42 +159,47 @@ public class ElytraAutoPilot implements ClientModInitializer {
     }
 	private void onScreenTick() //Once every screen frame
     {
+        // Stops logic when paused.
+        if (minecraftClient.isPaused()) {
+            doGlide = false;
+            if (minecraftClient.isInSingleplayer()) return;
+        }
+
+        // Player is null when it isn't currently in a world. Optimization spot here.
+        PlayerEntity player = minecraftClient.player;
+        if (player == null) return;
+
         //Fps adaptation (not perfect but works nicely most of the time)
         float fps_delta = minecraftClient.getLastFrameDuration();
         float fps_result = 20/fps_delta;
         double speedMod = 60/fps_result; //Adapt to base 60 FPS
 
-        if (minecraftClient.isPaused() && minecraftClient.isInSingleplayer()) return;
-        PlayerEntity player = minecraftClient.player;
-
-        if (player == null){
-            return;
-        }
+        // Calculate hard coded flight modes based on pitch.
         float pitch = player.getPitch();
-
-        if (onTakeoff) {
-            if (pitch > -90f) {
-                player.setPitch((float) (pitch - ModConfig.flightprofile.takeOffPull*speedMod));
-            }
-            if (pitch <= -90f) player.setPitch(-90f);
-        }
         if (doGlide) {
-            if (pitch < 0) {
+            if (pitch < GLIDE_ANGLE) {
                 player.setPitch((float) (pitch + ModConfig.advanced.pullDownSpeed*speedMod*3));
                 pitch = player.getPitch();
-                if (pitch >= 0f) {
-                    player.setPitch(0f);
+                if (pitch >= GLIDE_ANGLE) {
+                    player.setPitch(GLIDE_ANGLE);
                     doGlide = false;
                 }
             }
-            else if (pitch > 0){
+            else if (pitch > GLIDE_ANGLE){
                 player.setPitch((float) (pitch - ModConfig.advanced.pullDownSpeed*speedMod)*3);
                 pitch = player.getPitch();
-                if (pitch <= 0f) {
-                    player.setPitch(0f);
+                if (pitch <= GLIDE_ANGLE) {
+                    player.setPitch(GLIDE_ANGLE);
                     doGlide = false;
                 }
             }
+        }
+        else if (onTakeoff) {
+            if (pitch > -90f) {
+                player.setPitch((float) (pitch - ModConfig.flightprofile.takeOffPull*speedMod));
+                pitch = player.getPitch();
+            }
+            if (pitch <= -90f) player.setPitch(-90f); // Very stiff and unnatural movement
         }
         if (autoFlight) {
             // Flyto behavior
@@ -299,41 +305,7 @@ public class ElytraAutoPilot implements ClientModInitializer {
         double altitude;
         if (autoFlight) {
             // Elytra hotswap
-            int elytraDurability = player.getInventory().armor.get(2).getMaxDamage() - player.getInventory().armor.get(2).getDamage();
-            if (ModConfig.flightprofile.elytraHotswap) {
-                if (elytraDurability <= 5) { // Leave some leeway, so we don't stop flying
-                    // Optimization: find the first elytra with sufficient durability
-                    ItemStack newElytra = null;
-                    int minDurability = 10;
-                    for (ItemStack itemStack : player.getInventory().main) {
-                        if (itemStack.getItem() == Items.ELYTRA) {
-                            int itemDurability = itemStack.getMaxDamage() - itemStack.getDamage();
-                            if (itemDurability >= minDurability) {
-                                newElytra = itemStack;
-                                break;
-                            }
-                        }
-                    }
-                    if (newElytra != null) {
-                        int chestSlot = 6;
-                        assert minecraftClient.interactionManager != null;
-                        minecraftClient.interactionManager.clickSlot(
-                                player.playerScreenHandler.syncId,
-                                chestSlot,
-                                player.getInventory().main.indexOf(newElytra),
-                                SlotActionType.SWAP,
-                                player
-                        );
-                        player.playSound(SoundEvents.ITEM_ARMOR_EQUIP_ELYTRA, 1.0F, 1.0F);
-                        player.sendMessage(Text.translatable("text." + modid + ".swappedElytra").formatted(Formatting.GREEN), true);
-                    }
-                    else if (ModConfig.flightprofile.emergencyLand) {
-                        // If there's no elytra available and emergency land is enabled
-                        forceLand = true;
-                    }
-                }
-            }
-            else if (elytraDurability <= 30 && ModConfig.flightprofile.emergencyLand){
+            if (!tryRestockElytra(player) && ModConfig.flightprofile.emergencyLand) {
                 forceLand = true;
             }
 
@@ -400,7 +372,7 @@ public class ElytraAutoPilot implements ClientModInitializer {
         if(!configPressed && KeyBindings.configBinding.isPressed()) {
             if (player.isFallFlying()) {
                 if (!autoFlight && groundheight < ModConfig.flightprofile.minHeight){
-                    player.sendMessage(Text.translatable("text." + modid + ".autoFlightFail.tooLow").formatted(Formatting.RED), true);
+                    player.sendMessage(Text.translatable("text." + MODID + ".autoFlightFail.tooLow").formatted(Formatting.RED), true);
                     doGlide = true;
                 }
                 else {
@@ -416,7 +388,7 @@ public class ElytraAutoPilot implements ClientModInitializer {
             else {
                 // Otherwise, we open the settings if cloth is loaded
                 if (FabricLoader.getInstance().isModLoaded("cloth-config")) {
-                    Screen configScreen = ModMenu.getConfigScreen(modid, minecraftClient.currentScreen);
+                    Screen configScreen = ModMenu.getConfigScreen(MODID, minecraftClient.currentScreen);
                     minecraftClient.setScreen(configScreen);
                 }
             }
@@ -425,14 +397,10 @@ public class ElytraAutoPilot implements ClientModInitializer {
         landPressed = KeyBindings.landBinding.isPressed();
         takeoffPressed = KeyBindings.takeoffBinding.isPressed();
 
-	    if (startCooldown) {
-	        if (cooldown < 5) cooldown++;
-	        if (cooldown == 5) {
-	            cooldown = 0;
-	            startCooldown = false;
-	            onTakeoff = true;
-            }
+	    if (takeoffCooldown > 0) {
+           if (--takeoffCooldown == 0) onTakeoff = true;
         }
+
 	    if (onTakeoff) {
             takeoff();
         }
@@ -477,6 +445,44 @@ public class ElytraAutoPilot implements ClientModInitializer {
             }
         }
         return false;
+    }
+
+    private static boolean tryRestockElytra(PlayerEntity player) {
+        int elytraDurability = player.getInventory().armor.get(2).getMaxDamage() - player.getInventory().armor.get(2).getDamage();
+        if (ModConfig.flightprofile.elytraHotswap) {
+            if (elytraDurability <= 5) { // Leave some leeway, so we don't stop flying
+                // Optimization: find the first elytra with sufficient durability
+                ItemStack newElytra = null;
+                int minDurability = 10;
+                for (ItemStack itemStack : player.getInventory().main) {
+                    if (itemStack.getItem() == Items.ELYTRA) {
+                        int itemDurability = itemStack.getMaxDamage() - itemStack.getDamage();
+                        if (itemDurability >= minDurability) {
+                            newElytra = itemStack;
+                            break;
+                        }
+                    }
+                }
+                if (newElytra != null) {
+                    int chestSlot = 6;
+                    assert minecraftClient.interactionManager != null;
+                    minecraftClient.interactionManager.clickSlot(
+                            player.playerScreenHandler.syncId,
+                            chestSlot,
+                            player.getInventory().main.indexOf(newElytra),
+                            SlotActionType.SWAP,
+                            player
+                    );
+                    player.playSound(SoundEvents.ITEM_ARMOR_EQUIP_ELYTRA, 1.0F, 1.0F);
+                    player.sendMessage(Text.translatable("text." + MODID + ".swappedElytra").formatted(Formatting.GREEN), true);
+                }
+                else {
+                    return false;
+                }
+            }
+        }
+        else return elytraDurability > 30;
+        return true;
     }
 
     private void computeVelocity()

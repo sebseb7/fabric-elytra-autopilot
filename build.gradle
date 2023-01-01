@@ -38,10 +38,10 @@ dependencies {
 
 	modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
 
-	modImplementation "com.gitlab.Lortseam.completeconfig:base:${project.completeconfig_version}"
+	modImplementation "com.github.Lortseam.completeconfig:base:${project.completeconfig_version}"
 	include "com.gitlab.Lortseam.completeconfig:base:${project.completeconfig_version}"
 
-	modImplementation("com.gitlab.Lortseam.completeconfig:gui-cloth:${project.completeconfig_version}")
+	modImplementation("com.github.Lortseam.completeconfig:gui-cloth:${project.completeconfig_version}")
 	include "com.gitlab.Lortseam.completeconfig:gui-cloth:${project.completeconfig_version}"
 }
 
@@ -103,7 +103,7 @@ curseforge {
 	}
 	project {
 		id = '498496'
-		changelog = 'Just about everything!'
+		changelog = 'Updated to 1.19.3'
 		releaseType = 'release'
 		addGameVersion '1.19.3'
 
