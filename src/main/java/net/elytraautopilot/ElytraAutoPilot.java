@@ -115,7 +115,7 @@ public class ElytraAutoPilot implements ClientModInitializer {
                 int n = 2;
                 double c = clientPos.getY();
                 for (double i = c; i < l; i++) {
-                    BlockPos blockPos = new BlockPos(clientPos.getX(), clientPos.getY() + n, clientPos.getZ());
+                    BlockPos blockPos = BlockPos.ofFloored(clientPos.getX(), clientPos.getY() + n, clientPos.getZ());
                     if (!world.getBlockState(blockPos).isAir()) {
                         player.sendMessage(Text.translatable("text." + MODID + ".takeoffFail.clearSkyNeeded").formatted(Formatting.RED), true);
                         return;

@@ -50,7 +50,7 @@ public class Hud {
             int l = world.getBottomY();
             Vec3d clientPos = player.getPos();
             for (double i = clientPos.getY(); i > l; i--) {
-                BlockPos blockPos = new BlockPos(clientPos.getX(), i, clientPos.getZ());
+                BlockPos blockPos = BlockPos.ofFloored(clientPos.getX(), i, clientPos.getZ());
                 if (world.getBlockState(blockPos).isSolidBlock(world, blockPos)) {
                     groundheight = clientPos.getY() - i;
                     break;
