@@ -46,7 +46,7 @@ public class Hud {
                 velocityList.set(_index, currentVelocity);
                 velocityListHorizontal.set(_index, currentVelocityHorizontal);
             }
-            World world = player.world;
+            World world = player.getWorld();
             int l = world.getBottomY();
             Vec3d clientPos = player.getPos();
             for (double i = clientPos.getY(); i > l; i--) {

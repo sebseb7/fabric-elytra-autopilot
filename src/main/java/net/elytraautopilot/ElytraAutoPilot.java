@@ -1,6 +1,7 @@
 package net.elytraautopilot;
 
 import com.terraformersmc.modmenu.ModMenu;
+import me.lortseam.completeconfig.data.Config;
 import me.lortseam.completeconfig.gui.ConfigScreenBuilder;
 import me.lortseam.completeconfig.gui.cloth.ClothConfigScreenBuilder;
 import net.elytraautopilot.commands.ClientCommands;
@@ -79,7 +80,8 @@ public class ElytraAutoPilot implements ClientModInitializer {
         config.load();
 
         if (FabricLoader.getInstance().isModLoaded("cloth-config")) {
-            ConfigScreenBuilder.setMain(MODID, new ClothConfigScreenBuilder());
+            //ConfigScreenBuilder screenBuilder = new ClothConfigScreenBuilder();
+            //Screen configScreen = screenBuilder.build(minecraftClient.currentScreen, config);
         }
         ClientCommands.register(minecraftClient);
     }
@@ -109,7 +111,7 @@ public class ElytraAutoPilot implements ClientModInitializer {
                     return;
                 }
 
-                World world = player.world;
+                World world = player.getWorld();
                 Vec3d clientPos = player.getPos();
                 int l = world.getTopY();
                 int n = 2;
