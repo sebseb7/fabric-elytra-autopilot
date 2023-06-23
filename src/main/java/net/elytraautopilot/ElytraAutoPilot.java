@@ -80,8 +80,8 @@ public class ElytraAutoPilot implements ClientModInitializer {
         config.load();
 
         if (FabricLoader.getInstance().isModLoaded("cloth-config")) {
-            //ConfigScreenBuilder screenBuilder = new ClothConfigScreenBuilder();
-            //Screen configScreen = screenBuilder.build(minecraftClient.currentScreen, config);
+            ConfigScreenBuilder screenBuilder = new ClothConfigScreenBuilder();
+            Screen configScreen = screenBuilder.build(minecraftClient.currentScreen, config);
         }
         ClientCommands.register(minecraftClient);
     }
